@@ -12,9 +12,21 @@ const commandQueue = [];
 const AUTHORIZED_USER_ID = 1076889137;
 const SECRET_KEY = "doge";
 
-// =========================
+// ============================================================
+// HEALTH CHECK
+// ============================================================
+
+app.get('/', (req, res) => {
+    res.json({
+        success: true,
+        message: 'Roblox bridge is running'
+    });
+});
+
+// ============================================================
 // POLL COMMANDS
-// =========================
+// ============================================================
+
 app.get('/poll-commands', (req, res) => {
     const { secret } = req.query;
 
@@ -24,6 +36,7 @@ app.get('/poll-commands', (req, res) => {
         });
     }
 
+    // Return everything currently waiting and clear the queue.
     const commandsToExecute = commandQueue.splice(0);
 
     res.json({
@@ -32,9 +45,10 @@ app.get('/poll-commands', (req, res) => {
     });
 });
 
-// =========================
+// ============================================================
 // SEND COMMAND
-// =========================
+// ============================================================
+
 app.post('/send-command', (req, res) => {
     const {
         command,
@@ -42,19 +56,25 @@ app.post('/send-command', (req, res) => {
         secret
     } = req.body;
 
-    // Check secret
+    // -------------------------
+    // Authentication
+    // -------------------------
+
     if (secret !== SECRET_KEY) {
         return res.status(403).json({
             error: 'Unauthorized'
         });
     }
 
-    // Check user
     if (userId !== AUTHORIZED_USER_ID) {
         return res.status(403).json({
             error: 'User not authorized'
         });
     }
+
+    // -------------------------
+    // Validate command
+    // -------------------------
 
     if (typeof command !== 'string' || !command.trim()) {
         return res.status(400).json({
@@ -62,51 +82,86 @@ app.post('/send-command', (req, res) => {
         });
     }
 
-    /*
-        Expected format:
+    const input = command.trim();
 
-        require(7804327506).amigodogodenot123("eerilm")
-    */
+    // ========================================================
+    // FORMAT 1
+    //
+    // require(123456789).functionName("argument")
+    // ========================================================
 
-    const match = command.trim().match(
+    const functionMatch = input.match(
         /^require\((\d+)\)\.([A-Za-z_][A-Za-z0-9_]*)\(["']([^"']*)["']\)$/
     );
 
-    if (!match) {
-        return res.status(400).json({
-            error: 'Invalid command format',
-            expected: 'require(assetId).functionName("argument")'
+    if (functionMatch) {
+        const assetId = Number(functionMatch[1]);
+        const functionName = functionMatch[2];
+        const argument = functionMatch[3];
+
+        commandQueue.push({
+            assetId: assetId,
+            function: functionName,
+            argument: argument,
+            timestamp: Date.now()
+        });
+
+        console.log(
+            `Queued: require(${assetId}).${functionName}("${argument}")`
+        );
+
+        return res.json({
+            success: true
         });
     }
 
-    const assetId = Number(match[1]);
-    const functionName = match[2];
-    const argument = match[3];
+    // ========================================================
+    // FORMAT 2
+    //
+    // require(123456789)("argument")
+    // ========================================================
 
-    commandQueue.push({
-        assetId,
-        function: functionName,
-        argument,
-        timestamp: Date.now()
-    });
-
-    console.log(
-        `Queued: require(${assetId}).${functionName}("${argument}")`
+    const directMatch = input.match(
+        /^require\((\d+)\)\(["']([^"']*)["']\)$/
     );
 
-    res.json({
-        success: true,
-        command: {
-            assetId,
-            function: functionName,
-            argument
-        }
+    if (directMatch) {
+        const assetId = Number(directMatch[1]);
+        const argument = directMatch[2];
+
+        commandQueue.push({
+            assetId: assetId,
+            function: null,
+            argument: argument,
+            timestamp: Date.now()
+        });
+
+        console.log(
+            `Queued: require(${assetId})("${argument}")`
+        );
+
+        return res.json({
+            success: true
+        });
+    }
+
+    // ========================================================
+    // Invalid command
+    // ========================================================
+
+    return res.status(400).json({
+        error: 'Invalid command format',
+        expected: [
+            'require(assetId).functionName("argument")',
+            'require(assetId)("argument")'
+        ]
     });
 });
 
-// =========================
+// ============================================================
 // START SERVER
-// =========================
+// ============================================================
+
 app.listen(PORT, () => {
     console.log(`Bridge running on port ${PORT}`);
 });
