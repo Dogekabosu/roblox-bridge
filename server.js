@@ -89,31 +89,31 @@ app.post('/send-command', (req, res) => {
     //
     // require(123456789).functionName("argument")
     // ========================================================
+const functionMatch = input.match(
+    /^require\((\d+)\)\.([A-Za-z_][A-Za-z0-9_]*)\((.*)\)$/
+);
 
-    const functionMatch = input.match(
-        /^require\((\d+)\)\.([A-Za-z_][A-Za-z0-9_]*)\(["']([^"']*)["']\)$/
+if (functionMatch) {
+    const assetId = Number(functionMatch[1]);
+    const functionName = functionMatch[2];
+    const argumentText = functionMatch[3].trim();
+
+    commandQueue.push({
+        assetId,
+        function: functionName,
+        arguments: argumentText,
+        timestamp: Date.now()
+    });
+
+    console.log(
+        `Queued: require(${assetId}).${functionName}(${argumentText})`
     );
 
-    if (functionMatch) {
-        const assetId = Number(functionMatch[1]);
-        const functionName = functionMatch[2];
-        const argument = functionMatch[3];
+    return res.json({
+        success: true
+    });
+}
 
-        commandQueue.push({
-            assetId: assetId,
-            function: functionName,
-            argument: argument,
-            timestamp: Date.now()
-        });
-
-        console.log(
-            `Queued: require(${assetId}).${functionName}("${argument}")`
-        );
-
-        return res.json({
-            success: true
-        });
-    }
 
     // ========================================================
     // FORMAT 2
@@ -121,29 +121,30 @@ app.post('/send-command', (req, res) => {
     // require(123456789)("argument")
     // ========================================================
 
-    const directMatch = input.match(
-        /^require\((\d+)\)\(["']([^"']*)["']\)$/
+   const directMatch = input.match(
+    /^require\((\d+)\)\((.*)\)$/
+);
+
+if (directMatch) {
+    const assetId = Number(directMatch[1]);
+    const argumentText = directMatch[2].trim();
+
+    commandQueue.push({
+        assetId,
+        function: null,
+        arguments: argumentText,
+        timestamp: Date.now()
+    });
+
+    console.log(
+        `Queued: require(${assetId})(${argumentText})`
     );
 
-    if (directMatch) {
-        const assetId = Number(directMatch[1]);
-        const argument = directMatch[2];
+    return res.json({
+        success: true
+    });
+}
 
-        commandQueue.push({
-            assetId: assetId,
-            function: null,
-            argument: argument,
-            timestamp: Date.now()
-        });
-
-        console.log(
-            `Queued: require(${assetId})("${argument}")`
-        );
-
-        return res.json({
-            success: true
-        });
-    }
 
     // ========================================================
     // Invalid command
