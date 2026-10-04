@@ -5,7 +5,7 @@ const bodyParser = require('body-parser');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Middleware
+
 app.use(cors());
 app.use(bodyParser.json());
 
@@ -20,14 +20,14 @@ const SECRET_KEY = "doge";
 app.get('/poll-commands', (req, res) => { 
     const { gameId, secret } = req.query;
 
-    // Basic Security Check
+
     if (secret !== SECRET_KEY) {
         return res.status(403).json({ error: 'Unauthorized' });
     }
 
-    // Send pending commands and clear the queue
+
     const commandsToExecute = [...commandQueue];
-    commandQueue = []; // Clear queue after delivery
+    commandQueue = []; 
 
     res.json({
         success: true,
@@ -35,16 +35,16 @@ app.get('/poll-commands', (req, res) => {
     });
 });
 
-// 2. Your C# App sends commands to this endpoint
+
 app.post('/send-command', (req, res) => {
     const { script, userId, secret } = req.body;
 
-    // Security Check 1: Secret Key
+
     if (secret !== SECRET_KEY) {
         return res.status(403).json({ error: 'Unauthorized' });
     }
 
-    // Security Check 2: User ID Verification
+
     if (userId !== AUTHORIZED_USER_ID) {
         return res.status(403).json({ error: 'User not authorized' });
     }
@@ -53,7 +53,7 @@ app.post('/send-command', (req, res) => {
         return res.status(400).json({ error: 'Invalid script' });
     }
 
-    // Add to queue
+
     commandQueue.push({
         script: script,
         timestamp: Date.now(),
