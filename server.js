@@ -50,15 +50,7 @@ app.get('/poll-commands', (req, res) => {
 // ============================================================
 
 app.post('/send-command', (req, res) => {
-    const {
-        command,
-        userId,
-        secret
-    } = req.body;
-
-    // -------------------------
-    // Authentication
-    // -------------------------
+    const { command, userId, secret } = req.body;
 
     if (secret !== SECRET_KEY) {
         return res.status(403).json({
@@ -72,10 +64,6 @@ app.post('/send-command', (req, res) => {
         });
     }
 
-    // -------------------------
-    // Validate command
-    // -------------------------
-
     if (typeof command !== 'string' || !command.trim()) {
         return res.status(400).json({
             error: 'Missing command'
@@ -84,75 +72,80 @@ app.post('/send-command', (req, res) => {
 
     const input = command.trim();
 
-    // ========================================================
-    // FORMAT 1
-    //
-    // require(123456789).functionName("argument")
-    // ========================================================
-const functionMatch = input.match(
-    /^require\((\d+)\)\.([A-Za-z_][A-Za-z0-9_]*)\((.*)\)$/
-);
-
-if (functionMatch) {
-    const assetId = Number(functionMatch[1]);
-    const functionName = functionMatch[2];
-    const argumentText = functionMatch[3].trim();
-
-    commandQueue.push({
-        assetId,
-        function: functionName,
-        arguments: argumentText,
-        timestamp: Date.now()
-    });
-
-    console.log(
-        `Queued: require(${assetId}).${functionName}(${argumentText})`
+    // require(123456789).Function()
+    const noArgFunctionMatch = input.match(
+        /^require\((\d+)\)\.([A-Za-z_][A-Za-z0-9_]*)\(\)$/
     );
 
-    return res.json({
-        success: true
-    });
-}
+    if (noArgFunctionMatch) {
+        const assetId = Number(noArgFunctionMatch[1]);
+        const functionName = noArgFunctionMatch[2];
 
+        commandQueue.push({
+            assetId,
+            function: functionName,
+            argument: null,
+            timestamp: Date.now()
+        });
 
-    // ========================================================
-    // FORMAT 2
-    //
-    // require(123456789)("argument")
-    // ========================================================
+        console.log(
+            `Queued: require(${assetId}).${functionName}()`
+        );
 
-   const directMatch = input.match(
-    /^require\((\d+)\)\((.*)\)$/
-);
+        return res.json({ success: true });
+    }
 
-if (directMatch) {
-    const assetId = Number(directMatch[1]);
-    const argumentText = directMatch[2].trim();
-
-    commandQueue.push({
-        assetId,
-        function: null,
-        arguments: argumentText,
-        timestamp: Date.now()
-    });
-
-    console.log(
-        `Queued: require(${assetId})(${argumentText})`
+    // require(123456789).Function("hello")
+    const functionMatch = input.match(
+        /^require\((\d+)\)\.([A-Za-z_][A-Za-z0-9_]*)\(["']([^"']*)["']\)$/
     );
 
-    return res.json({
-        success: true
-    });
-}
+    if (functionMatch) {
+        const assetId = Number(functionMatch[1]);
+        const functionName = functionMatch[2];
+        const argument = functionMatch[3];
 
+        commandQueue.push({
+            assetId,
+            function: functionName,
+            argument,
+            timestamp: Date.now()
+        });
 
-    // ========================================================
-    // Invalid command
-    // ========================================================
+        console.log(
+            `Queued: require(${assetId}).${functionName}("${argument}")`
+        );
+
+        return res.json({ success: true });
+    }
+
+    // require(123456789)("hello")
+    const directMatch = input.match(
+        /^require\((\d+)\)\(["']([^"']*)["']\)$/
+    );
+
+    if (directMatch) {
+        const assetId = Number(directMatch[1]);
+        const argument = directMatch[2];
+
+        commandQueue.push({
+            assetId,
+            function: null,
+            argument,
+            timestamp: Date.now()
+        });
+
+        console.log(
+            `Queued: require(${assetId})("${argument}")`
+        );
+
+        return res.json({ success: true });
+    }
 
     return res.status(400).json({
         error: 'Invalid command format',
         expected: [
+            'require(assetId).functionName()',
             'require(assetId).functionName("argument")',
             'require(assetId)("argument")'
         ]
