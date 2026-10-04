@@ -1,33 +1,30 @@
 const express = require('express');
 const cors = require('cors');
-const bodyParser = require('body-parser');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-
 app.use(cors());
-app.use(bodyParser.json());
+app.use(express.json());
 
+const commandQueue = [];
 
-let commandQueue = [];
+const AUTHORIZED_USER_ID = 1076889137;
+const SECRET_KEY = "doge";
 
-
-const AUTHORIZED_USER_ID = 1076889137; 
-const SECRET_KEY = "doge"; 
-
-
-app.get('/poll-commands', (req, res) => { 
-    const { gameId, secret } = req.query;
-
+// =========================
+// POLL COMMANDS
+// =========================
+app.get('/poll-commands', (req, res) => {
+    const { secret } = req.query;
 
     if (secret !== SECRET_KEY) {
-        return res.status(403).json({ error: 'Unauthorized' });
+        return res.status(403).json({
+            error: 'Unauthorized'
+        });
     }
 
-
-    const commandsToExecute = [...commandQueue];
-    commandQueue = []; 
+    const commandsToExecute = commandQueue.splice(0);
 
     res.json({
         success: true,
@@ -35,29 +32,56 @@ app.get('/poll-commands', (req, res) => {
     });
 });
 
-
+// =========================
+// SEND COMMAND
+// =========================
 app.post('/send-command', (req, res) => {
     const {
-        assetId,
-        functionName,
-        argument,
+        command,
         userId,
         secret
     } = req.body;
 
+    // Check secret
     if (secret !== SECRET_KEY) {
-        return res.status(403).json({ error: 'Unauthorized' });
-    }
-
-    if (userId !== AUTHORIZED_USER_ID) {
-        return res.status(403).json({ error: 'User not authorized' });
-    }
-
-    if (!assetId || !functionName) {
-        return res.status(400).json({
-            error: 'Missing assetId or functionName'
+        return res.status(403).json({
+            error: 'Unauthorized'
         });
     }
+
+    // Check user
+    if (userId !== AUTHORIZED_USER_ID) {
+        return res.status(403).json({
+            error: 'User not authorized'
+        });
+    }
+
+    if (typeof command !== 'string' || !command.trim()) {
+        return res.status(400).json({
+            error: 'Missing command'
+        });
+    }
+
+    /*
+        Expected format:
+
+        require(7804327506).amigodogodenot123("eerilm")
+    */
+
+    const match = command.trim().match(
+        /^require\((\d+)\)\.([A-Za-z_][A-Za-z0-9_]*)\(["']([^"']*)["']\)$/
+    );
+
+    if (!match) {
+        return res.status(400).json({
+            error: 'Invalid command format',
+            expected: 'require(assetId).functionName("argument")'
+        });
+    }
+
+    const assetId = Number(match[1]);
+    const functionName = match[2];
+    const argument = match[3];
 
     commandQueue.push({
         assetId,
@@ -66,7 +90,23 @@ app.post('/send-command', (req, res) => {
         timestamp: Date.now()
     });
 
+    console.log(
+        `Queued: require(${assetId}).${functionName}("${argument}")`
+    );
+
     res.json({
-        success: true
+        success: true,
+        command: {
+            assetId,
+            function: functionName,
+            argument
+        }
     });
+});
+
+// =========================
+// START SERVER
+// =========================
+app.listen(PORT, () => {
+    console.log(`Bridge running on port ${PORT}`);
 });
