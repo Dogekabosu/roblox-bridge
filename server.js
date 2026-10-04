@@ -37,34 +37,36 @@ app.get('/poll-commands', (req, res) => {
 
 
 app.post('/send-command', (req, res) => {
-    const { script, userId, secret } = req.body;
-
+    const {
+        assetId,
+        functionName,
+        argument,
+        userId,
+        secret
+    } = req.body;
 
     if (secret !== SECRET_KEY) {
         return res.status(403).json({ error: 'Unauthorized' });
     }
 
-
     if (userId !== AUTHORIZED_USER_ID) {
         return res.status(403).json({ error: 'User not authorized' });
     }
 
-    if (!script || typeof script !== 'string') {
-        return res.status(400).json({ error: 'Invalid script' });
+    if (!assetId || !functionName) {
+        return res.status(400).json({
+            error: 'Missing assetId or functionName'
+        });
     }
 
-
     commandQueue.push({
-        script: script,
-        timestamp: Date.now(),
-        source: 'c#-app'
+        assetId,
+        function: functionName,
+        argument,
+        timestamp: Date.now()
     });
 
-    console.log(`Command queued. Queue size: ${commandQueue.length}`);
-    res.json({ success: true, message: 'Command queued for execution' });
-});
-
-app.listen(PORT, () => {
-    console.log(`Bridge server running on port ${PORT}`);
-    console.log(`Public URL must be accessible by Roblox (HTTPS required)`);
+    res.json({
+        success: true
+    });
 });
