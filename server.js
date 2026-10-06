@@ -9,18 +9,15 @@ app.use(express.json());
 
 const commandQueue = [];
 
-// SECURITY CONFIG
 const AUTHORIZED_USER_ID = 1076889137;
 const SECRET_KEY = process.env.SECRET_KEY || "doge";
 
-// ACTIVE CONNECTIONS TRACKING (In-Memory Only)
 const activeConnections = new Map();
 
-// Cleanup old connections every 1 minute
-const CLEANUP_INTERVAL = 60000; // 1 minute
-const CONNECTION_TIMEOUT = 120000; // 2 minutes
+const CLEANUP_INTERVAL = 60000;
+const CONNECTION_TIMEOUT = 120000;
 
-setInterval(() {
+setInterval(() => {
     const now = Date.now();
     for (const [userId, lastSeen] of activeConnections.entries()) {
         if (now - lastSeen > CONNECTION_TIMEOUT) {
@@ -30,13 +27,10 @@ setInterval(() {
     }
 }, CLEANUP_INTERVAL);
 
-// --- ENDPOINTS ---
-
 app.get('/', (req, res) => {
     res.json({ success: true, message: 'Roblox bridge is running' });
 });
 
-// Heartbeat Endpoint (FIXED SYNTAX)
 app.post('/keep-alive', (req, res) => {
     const { userId, secret } = req.body;
 
@@ -48,15 +42,13 @@ app.post('/keep-alive', (req, res) => {
         return res.status(403).json({ error: 'User not authorized' });
     }
 
-    // Register/Refresh connection
     activeConnections.set(userId, Date.now());
     console.log(`Heartbeat received from user ${userId}. Active connections: ${activeConnections.size}`);
     
     res.json({ success: true, message: 'Connection registered' });
 });
 
-// Check Connection Status Endpoint
-app.get('/is-connected', (req, res) {
+app.get('/is-connected', (req, res) => {
     if (req.query.secret !== SECRET_KEY) {
         return res.status(403).json({ error: 'Unauthorized' });
     }
@@ -67,12 +59,12 @@ app.get('/is-connected', (req, res) {
     }
 
     const isConnected = activeConnections.has(targetUserId) && 
-                        (Date.now() - activeConnections.get(targetUserId) < CONNECTION_TIMEOUT);
+                        (Date.now - activeConnections.get(targetUserId) < CONNECTION_TIMEOUT);
     
     res.json({ connected: isConnected });
 });
 
-app.get('/poll-commands', (req, res) {
+app.get('/poll-commands', (req, res) => {
     if (req.query.secret !== SECRET_KEY) {
         return res.status(403).json({ error: 'Unauthorized' });
     }
@@ -81,10 +73,9 @@ app.get('/poll-commands', (req, res) {
     res.json({ success: true, commands: commandsToExecute });
 });
 
-const COMMAND_REGEX =
-    /^require\((\d+)\)(?:([.:])([A-Za-z_][A-Za-z0-9_]*))?\((?:["']([^"']*)["'])?\)$/;
+const COMMAND_REGEX = /^require\((\d+)\)(?:([.:])([A-Za-z_][A-Za-z0-9_]*))?\((?:["']([^"']*)["'])?\)$/;
 
-app.post('/send-command', (req, res) {
+app.post('/send-command', (req, res) => {
     const { command, userId, secret } = req.body;
 
     if (secret !== SECRET_KEY) {
@@ -142,6 +133,4 @@ app.post('/send-command', (req, res) {
 
 app.listen(PORT, () => {
     console.log(`Bridge running on port ${PORT}`);
-    console.log(`Security: Secret key protection enabled.`);
-    console.log(`Heartbeat: Active connection tracking enabled.`);
 });
