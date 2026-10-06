@@ -12,56 +12,8 @@ const commandQueue = [];
 const AUTHORIZED_USER_ID = 1076889137;
 const SECRET_KEY = process.env.SECRET_KEY || "doge";
 
-const activeConnections = new Map();
-
-const CLEANUP_INTERVAL = 60000;
-const CONNECTION_TIMEOUT = 120000;
-
-setInterval(() => {
-    const now = Date.now();
-    for (const [userId, lastSeen] of activeConnections.entries()) {
-        if (now - lastSeen > CONNECTION_TIMEOUT) {
-            activeConnections.delete(userId);
-            console.log(`Connection timeout: User ${userId} removed from active list.`);
-        }
-    }
-}, CLEANUP_INTERVAL);
-
 app.get('/', (req, res) => {
     res.json({ success: true, message: 'Roblox bridge is running' });
-});
-
-app.post('/keep-alive', (req, res) => {
-    const { userId, secret } = req.body;
-
-    if (secret !== SECRET_KEY) {
-        return res.status(403).json({ error: 'Unauthorized' });
-    }
-
-    if (userId !== AUTHORIZED_USER_ID) {
-        return res.status(403).json({ error: 'User not authorized' });
-    }
-
-    activeConnections.set(userId, Date.now());
-    console.log(`Heartbeat received from user ${userId}. Active connections: ${activeConnections.size}`);
-    
-    res.json({ success: true, message: 'Connection registered' });
-});
-
-app.get('/is-connected', (req, res) => {
-    if (req.query.secret !== SECRET_KEY) {
-        return res.status(403).json({ error: 'Unauthorized' });
-    }
-    
-    const targetUserId = req.query.userId;
-    if (!targetUserId) {
-        return res.status(400).json({ error: 'userId parameter required' });
-    }
-
-    const isConnected = activeConnections.has(targetUserId) && 
-                        (Date.now - activeConnections.get(targetUserId) < CONNECTION_TIMEOUT);
-    
-    res.json({ connected: isConnected });
 });
 
 app.get('/poll-commands', (req, res) => {
@@ -73,7 +25,8 @@ app.get('/poll-commands', (req, res) => {
     res.json({ success: true, commands: commandsToExecute });
 });
 
-const COMMAND_REGEX = /^require\((\d+)\)(?:([.:])([A-Za-z_][A-Za-z0-9_]*))?\((?:["']([^"']*)["'])?\)$/;
+const COMMAND_REGEX =
+    /^require\((\d+)\)(?:([.:])([A-Za-z_][A-Za-z0-9_]*))?\((?:["']([^"']*)["'])?\)$/;
 
 app.post('/send-command', (req, res) => {
     const { command, userId, secret } = req.body;
